@@ -1,46 +1,54 @@
-# /note-post コマンド
+# /note-post コマンド v2.0
 
-noteでバズる記事を自動生成します。
+テーマを与えるだけで、リサーチ→執筆→画像生成→自動投稿まで実行します。
 
 ## 使い方
 
 ```
-/note-post テーマ:"[テーマ]" ターゲット:"[読者層]" 文体:"[文体]"
+/note-post テーマ:"[テーマ]"
 ```
 
-## 処理内容
+引数: `$ARGUMENTS`
 
-`.claude/skills/note-buzz-post.md` のスキルを実行します。
+## 実行フロー
 
-1. ディープリサーチ（Pass1 → Pass2）
-2. タイトル3案 + 記事構成の設計・提示
-3. 本文執筆（Claude）
-4. NanoBanana2用 図解プロンプト生成
-5. 完成記事のレイアウト組み立て
-6. バズスコア評価（100点満点）
-7. output/articles/ に保存 + GitHub issue記録
-8. **自動投稿**（Phase 7）— Playwright で note.com に自動投稿
+`.claude/skills/note-buzz-post.md` のスキルに従って実行。
 
-## Phase 7: 自動投稿（オプション）
+### Step 1: リサーチ（3エージェント並列）
+- テーマの最新情報
+- note.comバズ記事分析
+- 読者ペイン調査
 
-記事完成後、以下で note.com に自動投稿できます:
+### Step 2: 企画
+- タイトル3案を提示 → ユーザー確認
+- 記事構成（H2×4 + リード + まとめ）
+
+### Step 3: 執筆
+- AI臭ゼロルールに従って本文生成
+- 語尾チェック（3連続禁止）
+- 1,500〜2,500字
+
+### Step 4: 画像生成
+```bash
+# サムネイル
+node scripts/generate-thumbnail.js "[プロンプト]" output/articles/thumbnail.png
+
+# 図解3枚
+node scripts/generate-thumbnail.js "[図解プロンプト]" output/articles/fig1.png
+node scripts/generate-thumbnail.js "[図解プロンプト]" output/articles/fig2.png
+node scripts/generate-thumbnail.js "[図解プロンプト]" output/articles/fig3.png
+```
+
+### Step 5: 記事ファイル生成
+Markdown形式で `output/articles/YYYYMMDD_[slug].md` に保存。
+画像は `![alt](output/articles/fig1.png)` で埋め込み。
+
+### Step 6: 自動投稿
+```bash
+node scripts/publish-article.js output/articles/[記事].md output/articles/thumbnail.png publish
+```
 
 ### 前提条件
-- `~/.note-state.json` が存在すること（Cookie認証済み）
-- 未設定の場合: Chrome拡張でCookie取得 → `node scripts/cookies-to-state.js cookies.txt`
-
-### 投稿コマンド
-```bash
-# サムネイル生成
-node scripts/generate-thumbnail.js "[記事タイトル]" test/thumbnail.png
-
-# 下書き保存
-node scripts/test-draft.js test/thumbnail.png draft
-
-# 公開投稿
-node scripts/test-draft.js test/thumbnail.png publish
-```
-
-### 注意
-- 初回は下書き（draft）でテストすることを推奨
-- セッション期限切れ時は Cookie の再取得が必要（1-2週間）
+- `~/.note-state.json` が存在すること
+- 未設定: Chrome拡張でCookie取得 → `node scripts/cookies-to-state.js cookies.txt`
+- セッション期限: 1-2週間で再取得が必要
