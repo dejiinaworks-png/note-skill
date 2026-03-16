@@ -95,48 +95,65 @@ try {
     console.log('[2/7] サムネイル設定中...');
     let thumbnailSet = false;
 
-    // 方法1: エディター左上の表紙画像アイコンをクリック
-    const coverSelectors = [
-      'button:has-text("表紙")',
-      'button[aria-label*="表紙"]',
-      'button[aria-label*="アイキャッチ"]',
-      'button[aria-label*="画像"]',
-      '[data-testid*="cover"]',
-      '[data-testid*="eyecatch"]',
-      '.p-editor__coverButton',
-      // エディター上部の画像追加エリア
-      '.o-editorEyecatch',
-      'div[class*="eyecatch"]',
-      'div[class*="cover"] button',
-    ];
+    // note.comエディターの「画像を追加」ボタン → 「画像をアップロード」
+    try {
+      const addImageBtn = page.locator('button[aria-label="画像を追加"]').first();
+      if (await addImageBtn.isVisible({ timeout: 3000 })) {
+        await addImageBtn.click();
+        await page.waitForTimeout(1500);
 
-    for (const sel of coverSelectors) {
-      try {
-        const el = page.locator(sel).first();
-        if (await el.isVisible({ timeout: 1500 })) {
-          await el.click();
-          await page.waitForTimeout(1500);
-          // ファイル入力が出現するか確認
-          const fi = page.locator('input[type="file"]').first();
-          if (await fi.count() > 0) {
-            await fi.setInputFiles(resolve(THUMBNAIL_PATH));
-            await page.waitForTimeout(3000);
-            thumbnailSet = true;
-            console.log(`  OK: ${sel}`);
-            break;
+        // 「画像をアップロード」ボタン → filechooser
+        const uploadBtn = page.locator('button:has-text("画像をアップロード")').first();
+        if (await uploadBtn.isVisible({ timeout: 2000 })) {
+          const [fileChooser] = await Promise.all([
+            page.waitForEvent('filechooser', { timeout: 10000 }),
+            uploadBtn.click(),
+          ]);
+          await fileChooser.setFiles(resolve(THUMBNAIL_PATH));
+          await page.waitForTimeout(3000);
+
+          // トリミングモーダルが出たら「保存」を押す
+          // モーダル内に限定して検索（.ReactModal__Content 内のボタン）
+          try {
+            const modalSel = '.ReactModal__Content, .CropModal, [role="dialog"]';
+            await page.waitForSelector(modalSel, { timeout: 5000 });
+            await page.waitForTimeout(1000);
+            // モーダル内の「保存」ボタンを探す
+            const cropBtnSelectors = [
+              `.ReactModal__Content button:has-text("保存")`,
+              `[role="dialog"] button:has-text("保存")`,
+              `.CropModal button:has-text("保存")`,
+              `.ReactModal__Content button:has-text("適用")`,
+              `.ReactModal__Content button:has-text("完了")`,
+              `.ReactModal__Content button:has-text("OK")`,
+            ];
+            for (const cs of cropBtnSelectors) {
+              const cropBtn = page.locator(cs).first();
+              if (await cropBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await cropBtn.click();
+                console.log(`  トリミング確定: ${cs}`);
+                await page.waitForTimeout(3000);
+                break;
+              }
+            }
+          } catch {
+            console.log('  トリミングモーダル検出なし（自動確定スキップ）');
           }
+
+          thumbnailSet = true;
+          console.log('  OK: 画像をアップロード');
         }
-      } catch {}
+      }
+    } catch (e) {
+      console.log(`  方法1失敗: ${e.message}`);
     }
 
-    // 方法2: 隠れたinput[type="file"]に直接セット（file chooserイベント使用）
+    // フォールバック: input[type="file"] 直接
     if (!thumbnailSet) {
       try {
-        // ページ内の全input[type="file"]を探す
-        const fileInputs = page.locator('input[type="file"]');
-        const count = await fileInputs.count();
-        if (count > 0) {
-          await fileInputs.first().setInputFiles(resolve(THUMBNAIL_PATH));
+        const fi = page.locator('input[type="file"]').first();
+        if (await fi.count() > 0) {
+          await fi.setInputFiles(resolve(THUMBNAIL_PATH));
           await page.waitForTimeout(3000);
           thumbnailSet = true;
           console.log('  OK: input[type="file"] direct');
@@ -144,44 +161,77 @@ try {
       } catch {}
     }
 
-    // 方法3: filechooserイベントをリッスンしてから画像エリアクリック
-    if (!thumbnailSet) {
-      try {
-        const [fileChooser] = await Promise.all([
-          page.waitForEvent('filechooser', { timeout: 5000 }),
-          page.locator('div[class*="editor"] >> nth=0').click(),
-        ]);
-        await fileChooser.setFiles(resolve(THUMBNAIL_PATH));
-        await page.waitForTimeout(3000);
-        thumbnailSet = true;
-        console.log('  OK: filechooser event');
-      } catch {}
+    if (!thumbnailSet) console.log('  SKIP: サムネイル設定に失敗');
+
+    // ダイアログ/モーダルが残っていたら閉じる
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(2000);
+    try {
+      const closeBtn = page.locator('button:has-text("閉じる")').first();
+      if (await closeBtn.isVisible({ timeout: 1000 })) await closeBtn.click();
+    } catch {}
+    await page.waitForTimeout(2000);
+
+    // エディター画面にいるか確認。いなければ戻る
+    const currentUrl = page.url();
+    console.log(`  現在URL: ${currentUrl}`);
+    if (!currentUrl.includes('editor.note.com') && !currentUrl.includes('/notes/')) {
+      console.log('  エディターから離脱。新規エディターに移動...');
+      await page.goto('https://note.com/notes/new', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.waitForTimeout(2000);
     }
 
-    if (!thumbnailSet) {
-      console.log('  SKIP: サムネイル設定に失敗（手動で設定してください）');
-      // ページ内の要素をログ出力
-      const buttons = await page.$$eval('button', els =>
-        els.slice(0, 15).map(el => ({ text: el.textContent?.trim().slice(0, 40), ariaLabel: el.getAttribute('aria-label') }))
-      );
-      console.log('  エディター内ボタン:', JSON.stringify(buttons, null, 2));
-    }
   } else {
     console.log('[2/7] SKIP: サムネなし');
   }
 
   // ===== 3. タイトル入力 =====
   console.log('[3/7] タイトル入力中...');
-  const titleSel = 'textarea[placeholder*="タイトル"], textarea[data-testid="note-title"]';
-  await page.waitForSelector(titleSel, { timeout: 10000 });
-  await page.fill(titleSel, title);
+  // ページ上部にスクロール
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1000);
+
+  // タイトルフィールドを複数セレクターで探す
+  const titleSelectors = [
+    'textarea[placeholder*="タイトル"]',
+    'textarea[data-testid="note-title"]',
+    'textarea[placeholder*="title"]',
+    'textarea',  // 最終フォールバック
+  ];
+  let titleFilled = false;
+  for (const sel of titleSelectors) {
+    try {
+      const el = page.locator(sel).first();
+      if (await el.isVisible({ timeout: 5000 })) {
+        await el.fill(title);
+        titleFilled = true;
+        console.log(`  OK: ${sel}`);
+        break;
+      }
+    } catch {}
+  }
+  if (!titleFilled) {
+    console.log('  WARN: タイトルフィールドが見つかりません。セレクターを確認:');
+    const textareas = await page.$$eval('textarea', els =>
+      els.map(el => ({ placeholder: el.placeholder, class: el.className?.slice(0, 50) }))
+    );
+    console.log('  textareas:', JSON.stringify(textareas));
+    // 全input/textareaを試す
+    const allInputs = await page.$$eval('input, textarea', els =>
+      els.slice(0, 10).map(el => ({ tag: el.tagName, type: el.type, placeholder: el.placeholder?.slice(0, 30) }))
+    );
+    console.log('  inputs:', JSON.stringify(allInputs));
+  }
   await page.waitForTimeout(500);
 
   // ===== 4. 本文入力 + 画像挿入 =====
   console.log('[4/7] 本文入力中...');
   const bodySel = 'div[contenteditable="true"][role="textbox"], div.ProseMirror';
   await page.waitForSelector(bodySel, { timeout: 10000 });
-  await page.click(bodySel);
+  // オーバーレイが残っている場合はESCで閉じる
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+  await page.locator(bodySel).click({ force: true });
 
   let insertedImages = 0;
   for (let i = 0; i < processedLines.length; i++) {
@@ -198,46 +248,68 @@ try {
     const imageToInsert = imageInsertPoints.find(p => p.afterLine === i + 1);
     if (imageToInsert) {
       console.log(`  画像挿入中: ${imageToInsert.imagePath}`);
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(500);
 
       let imgInserted = false;
 
-      // 方法1: 「+」ボタンを見つけてクリック
       try {
-        const plusBtn = page.locator('button:has-text("+"), button[aria-label*="追加"], [data-testid*="add-block"]').first();
-        if (await plusBtn.isVisible({ timeout: 2000 })) {
+        // Step 1: 空行を作ってカーソルを置く（「+」メニューが表示される条件）
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(1000);
+
+        // Step 2: 「メニューを開く」ボタン（+ボタン）をクリック
+        const plusBtn = page.locator('button[aria-label="メニューを開く"]').first();
+        if (await plusBtn.isVisible({ timeout: 3000 })) {
           await plusBtn.click();
           await page.waitForTimeout(1000);
-          // 画像オプションをクリック
-          const imgOption = page.locator('button:has-text("画像"), [data-testid*="image"]').first();
-          if (await imgOption.isVisible({ timeout: 2000 })) {
+
+          // Step 3: メニュー内の「画像」ボタンをクリック → filechooser をキャッチ
+          const imgBtn = page.locator('button.sc-6fa32351-4:has-text("画像")').first();
+          if (await imgBtn.isVisible({ timeout: 2000 })) {
             const [fileChooser] = await Promise.all([
-              page.waitForEvent('filechooser', { timeout: 5000 }),
-              imgOption.click(),
+              page.waitForEvent('filechooser', { timeout: 10000 }),
+              imgBtn.click(),
             ]);
             await fileChooser.setFiles(imageToInsert.imagePath);
-            await page.waitForTimeout(3000);
+            await page.waitForTimeout(4000);
             imgInserted = true;
           }
         }
-      } catch {}
+      } catch (e) {
+        console.log(`    メニュー方式失敗: ${e.message.slice(0, 80)}`);
+      }
 
-      // 方法2: filechooserイベントで直接
+      // フォールバック: メニューのクラスが変わった場合に備えてテキストのみでマッチ
       if (!imgInserted) {
         try {
-          const fileInputs = page.locator('input[type="file"]');
-          if (await fileInputs.count() > 0) {
-            await fileInputs.last().setInputFiles(imageToInsert.imagePath);
-            await page.waitForTimeout(3000);
+          // メニューが閉じていたら再度開く
+          const plusBtn2 = page.locator('button[aria-label="メニューを開く"]').first();
+          if (await plusBtn2.isVisible({ timeout: 2000 })) {
+            await plusBtn2.click();
+            await page.waitForTimeout(1000);
+          }
+          // role="menu" 内の「画像」
+          const imgBtn2 = page.locator('[role="menu"] button:has-text("画像")').first();
+          if (await imgBtn2.isVisible({ timeout: 2000 })) {
+            const [fileChooser] = await Promise.all([
+              page.waitForEvent('filechooser', { timeout: 10000 }),
+              imgBtn2.click(),
+            ]);
+            await fileChooser.setFiles(imageToInsert.imagePath);
+            await page.waitForTimeout(4000);
             imgInserted = true;
           }
-        } catch {}
+        } catch (e) {
+          console.log(`    フォールバック失敗: ${e.message.slice(0, 80)}`);
+        }
       }
 
       if (imgInserted) {
         insertedImages++;
         console.log(`  OK (${insertedImages}/${imageInsertPoints.length})`);
+        // 画像挿入後、カーソルを画像の下に移動
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(500);
       } else {
         console.log(`  SKIP: 画像挿入失敗`);
       }
