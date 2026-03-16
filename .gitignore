@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Authentication & Secrets (NEVER commit these)
+.env
+*.cookies.txt
+note.com_cookies.txt
+cookies.txt
+*.note-state.json
+.note-state.json
+
+# Screenshots (test artifacts)
+test/*.png
+test/*.jpg
+
+# Local backups
+.claude-local-backup/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Research docs (personal)
+システムリサーチ専用コピペ.md
+リサーチ提案*.txt
