@@ -23,3 +23,25 @@ Thumbs.db
 # Research docs (personal)
 システムリサーチ専用コピペ.md
 リサーチ提案*.txt
+Windows用リサーチ提案.md
+
+# Generated output (articles, images)
+output/
+
+# Research results
+research/
+
+# Skill browser sessions (auth data)
+スキル/nanobanana-pro/data/browser_profile/
+スキル/nanobanana-pro/data/state.json
+
+# Python virtualenv inside skills
+スキル/*/.venv/
+スキル/*/__pycache__/
+
+# Workflow / session temp files
+.workflow_state.json
+.agent-trace/
+.claude/temp/
+.claude/hooks/data/model-switch.log
+.claude/hooks/data/skill-guard-detail.json

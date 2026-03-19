@@ -1,135 +1,286 @@
-# Note投稿くん v1.0
+# Note投稿くん v4.0
 
-note.com でバズる記事を **リサーチ → 企画 → 文章生成 → 図解作成 → 自動投稿** まで一気通貫で実行するスキルです。
+note.com でバズる記事を **リサーチ → 記事作成 → 図解生成 → 自動投稿** まで一気通貫で実行するスキルです。
 
-## Overview
+---
 
-| フェーズ | 内容 | ステータス |
-|---------|------|-----------|
-| Phase 1 | ディープリサーチ（2段階方式） | Ready |
-| Phase 2 | 企画・構成設計 | Ready |
-| Phase 3 | 文章生成（Claude） | Ready |
-| Phase 4 | 図解生成（NanoBanana2 / Gemini） | Ready |
-| Phase 5 | レイアウト組み立て | Ready |
-| Phase 6 | 品質チェック | Ready |
-| Phase 7 | **note.com 自動投稿** | **v1.0 NEW** |
+## バージョン履歴
 
-## Features
+| バージョン | 追加内容 |
+|-----------|---------|
+| v1.0 | Cookie認証 + Playwright自動投稿（テキストのみ） |
+| v2.0 | AI臭ゼロ記事テンプレート + サムネイルUI設定 |
+| v3.0 | 図解画像の自動挿入（ハイブリッド投稿方式） |
+| **v4.0** | **プロンプト生成例の自動生成 + スキルフォルダ整備** |
 
-### コンテンツ戦略（Phase 1-6）
-- バズる記事パターン分析・テンプレート
-- ディープリサーチスキル（note/X/YouTube/Reddit）
-- NanoBanana2 対応の図解・バナー生成プロンプト
-- 記事構成テンプレート（ノウハウ型 / ストーリー型 / リスト型）
-- 96種のエージェント + 110+ スキル
+---
 
-### 自動投稿（Phase 7）
-- Cookie ベース認証（Chrome 拡張から書き出し）
-- Playwright でブラウザ自動操作
-- タイトル・本文入力 → 下書き保存 → 公開まで全自動
-- Gemini API によるサムネイル画像の自動生成
+## ワークフロー全体像
+
+```
+STEP 1: リサーチ
+  └─ /research-free または /mega-research でトピックを深掘り
+
+STEP 2: 記事構成・執筆
+  └─ note投稿ナレッジ を参照しながら Claude で記事作成
+  └─ output/articles/<日付>_<slug>.md に保存
+
+STEP 3: 図解生成
+  └─ /nanobanana-pro で図解・サムネイルを生成
+  └─ output/articles/images/ に保存（ex_fig1.png 等）
+
+STEP 4: 自動投稿
+  └─ publish-hybrid.js で note.com に下書き保存
+  └─ ブラウザで確認 → 公開
+```
+
+---
+
+## STEP 1: リサーチ
+
+### コマンド
+
+```
+/research-free <トピック>
+```
+
+APIキー不要。Claude Code組み込みのWebSearch + WebFetchで動作。
+
+```
+/mega-research <トピック>
+```
+
+複数APIを使った高精度リサーチ（APIキーが必要）。
+
+### 参考ナレッジ
+
+- `スキル/note投稿ナレッジ/` に17ファイルのコピーライティングノウハウを収録
+  - `最強コラム執筆システム.txt` → 記事構成の骨格
+  - `冒頭フック事例集.txt` → 読まれるリード文
+  - `読者心理操作テクニック集.txt` → エンゲージメント向上
+  - `コラム作成絶対禁止事項.txt` → AI臭を消す禁止ワード
+
+---
+
+## STEP 2: 記事作成
+
+### マークダウン形式
+
+記事は以下のフォーマットで `output/articles/` に作成：
+
+```markdown
+---
+title: 記事タイトル
+tags:
+  - タグ1
+  - タグ2
+---
+
+本文...
+
+![](images/diagram_fig1.png)
+
+---
+
+#タグ1 #タグ2
+```
+
+### 画像の挿入ルール
+
+- 画像は `output/articles/images/` に配置
+- マークダウン内は `![](images/ファイル名.png)` の形式で参照
+- 投稿スクリプトが自動でnote.comにアップロードする
+
+### 太字の注意事項
+
+note.comでは特殊文字を含む太字は正常に表示されない：
+
+```
+❌ **① 「インフォグラフィック」と明記する**
+✅ ### インフォグラフィックと明記する
+```
+
+**ルール**: `**bold**` は純粋な日本語・英語のみに使用。①②③や「」❌などはH3見出しで代用。
+
+---
+
+## STEP 3: 図解生成
+
+### 基本コマンド
+
+```bash
+cd "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/スキル/nanobanana-pro"
+
+# 図解を1枚生成
+python scripts/run.py image_generator.py \
+  --prompt "フローチャート。日本語ゴシック体。16:9白背景。..." \
+  --output "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/output/articles/images/ex_fig1.png"
+```
+
+または Claude Code から：
+
+```
+/nanobanana-pro
+```
+
+### 認証（初回のみ）
+
+```bash
+cd "スキル/nanobanana-pro"
+python scripts/run.py auth_manager.py status   # 認証状態確認
+python scripts/run.py auth_manager.py setup    # ブラウザ起動でGoogleログイン
+```
+
+認証は約7日間有効。セッションは `スキル/nanobanana-pro/data/browser_profile/` に保存。
+
+### タイムアウト対策
+
+複雑なプロンプトは180秒でタイムアウトすることがある。対策：
+
+1. `--timeout 300` を追加
+2. プロンプトを短く・シンプルにする
+3. 複雑な構造（大量テキスト含む比較表など）は内容を絞る
+
+### プロンプトのコツ（図解で安定生成するパターン）
+
+| 目的 | 安定するパターン | タイムアウトしやすいパターン |
+|------|-----------------|--------------------------|
+| フローチャート | 手順を箇条書きで渡す | 長い説明文を入れる |
+| 比較表 | 列タイトルをシンプルに | 「悪い例 vs 良い例」など評価的な表現 |
+| 階層図 | ルート→ブランチを矢印で表現 | 詳細な説明を各ノードに追加 |
+
+---
+
+## STEP 4: 自動投稿
+
+### コマンド
+
+```bash
+cd "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん"
+
+node scripts/publish-hybrid.js \
+  <記事MDパス> \
+  <サムネイル画像パス> \
+  <draft|publish> \
+  <画像ベースディレクトリ>
+```
+
+### 実行例
+
+```bash
+# 下書き保存（確認してから公開）
+node scripts/publish-hybrid.js \
+  output/articles/20260319_nanobana_diagram.md \
+  output/articles/images/diagram_thumbnail.png \
+  draft \
+  output/articles
+
+# 直接公開
+node scripts/publish-hybrid.js \
+  output/articles/20260319_nanobana_diagram.md \
+  output/articles/images/diagram_thumbnail.png \
+  publish \
+  output/articles
+```
+
+### 引数の説明
+
+| 引数 | 説明 | 例 |
+|------|------|----|
+| 記事MDパス | Markdownファイルのパス | `output/articles/xxx.md` |
+| サムネイル | サムネイル画像（省略可） | `output/articles/images/thumb.png` |
+| モード | `draft` or `publish` | `draft` |
+| 画像ベースDir | 画像の基準ディレクトリ（必須） | `output/articles` |
+
+**重要**: 画像ベースDirを省略すると画像が0枚になる。記事MDがある階層（`output/articles`）を渡す。
+
+### 認証セットアップ（初回のみ）
+
+```bash
+# Chrome で note.com にログイン後、Cookie拡張でエクスポート
+# ファイル名 note.com_cookies.txt としてプロジェクトルートに配置
+
+node scripts/cookies-to-state.js note.com_cookies.txt
+# → ~/.note-state.json にセッション保存
+```
+
+---
+
+## フォルダ構成
+
+```
+Note投稿くん/
+├── scripts/                      # 自動投稿スクリプト
+│   └── publish-hybrid.js         # メイン投稿スクリプト（v4）
+│
+├── スキル/                       # 自己完結スキル群
+│   ├── nanobanana-pro/           # Gemini画像生成スキル
+│   │   ├── scripts/              # Pythonスクリプト群
+│   │   ├── data/browser_profile/ # Googleログインセッション
+│   │   └── SKILL.md              # スキル使い方ガイド
+│   │
+│   └── note投稿ナレッジ/         # コピーライティングナレッジ17ファイル
+│       ├── 最強コラム執筆システム.txt
+│       ├── 冒頭フック事例集.txt
+│       ├── 読者心理操作テクニック集.txt
+│       └── ...
+│
+├── output/                       # 生成物（Gitignore）
+│   └── articles/
+│       ├── <日付>_<slug>.md      # 記事本文
+│       └── images/               # 図解・サムネイル
+│           ├── diagram_fig1.png  # 記事構造用図解
+│           ├── ex_fig1_xxx.png   # プロンプト生成例
+│           └── thumbnail.png     # サムネイル
+│
+├── templates/                    # 記事テンプレート
+├── research/                     # リサーチ結果
+└── README.md                     # このファイル
+```
+
+---
+
+## Tips
+
+### 記事ファイルの命名規則
+
+```
+output/articles/<YYYYMMDD>_<英語スラッグ>.md
+output/articles/images/<YYYYMMDD>_<スラッグ>_thumbnail.png
+```
+
+### 図解命名規則
+
+| ファイル名 | 用途 |
+|-----------|------|
+| `diagram_fig1.png` | 記事の説明・構造図（記事内任意の位置） |
+| `ex_fig1_flowchart.png` | プロンプト1の生成例（コードブロック直後） |
+| `thumbnail.png` | サムネイル（publish-hybrid.js第2引数） |
+
+### 品質チェックリスト（投稿前）
+
+- [ ] 太字に特殊文字（①「」❌）が含まれていないか
+- [ ] 各プロンプトの直後に「▼ 実際に生成してみた」+ 生成例画像があるか
+- [ ] サムネイル画像が設定されているか
+- [ ] 画像ベースDirを引数に渡しているか（画像: 0枚 になっていないか）
+- [ ] 下書きをブラウザで確認してから公開
 
 ---
 
 ## Requirements
 
 - **Node.js** 18+
-- **Chrome 拡張**: [Get cookies.txt locally](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)
-- **note.com アカウント**（ログイン済み）
-- **Gemini API Key**（サムネイル生成を使う場合）
-
-## Quick Start
-
-### 1. セットアップ
-
-```bash
-git clone https://github.com/dejiinaworks-png/note-skill.git
-cd note-skill
-npm install
-npx playwright install chromium
-cp .env.example .env
-# .env に Gemini API Key を設定
-```
-
-### 2. note.com の認証
-
-```bash
-# Chrome で note.com にログイン → 拡張で Cookie を Export
-# ダウンロードした cookies.txt をプロジェクトルートに配置
-
-node scripts/cookies-to-state.js note.com_cookies.txt
-# → ~/.note-state.json にセッション状態が保存される
-```
-
-### 3. 投稿テスト
-
-```bash
-# サムネイル画像を生成
-node scripts/generate-thumbnail.js
-
-# 下書きとして保存
-node scripts/test-draft.js test/thumbnail.png draft
-
-# 公開投稿
-node scripts/test-draft.js test/thumbnail.png publish
-```
-
----
-
-## Project Structure
-
-```
-note-skill/
-├── .claude/                    # Claude Code スキル・エージェント群
-│   ├── skills/
-│   │   ├── note-buzz-post.md       # バズ投稿スキル（メイン）
-│   │   ├── note-marketing/         # noteマーケティングスキル
-│   │   ├── note-research/          # noteリサーチスキル
-│   │   ├── nanobanana-pro/         # NanoBanana2 画像生成
-│   │   └── ... (110+ skills)
-│   ├── agents/                     # 96種のエージェント
-│   └── commands/
-│       └── post-note.md            # /post-note コマンド
-├── scripts/                    # 自動投稿スクリプト群（Phase 7）
-│   ├── cookies-to-state.js         # Cookie → Playwright State 変換
-│   ├── generate-thumbnail.js       # Gemini でサムネイル生成
-│   ├── login-note.js               # ブラウザログイン（代替手段）
-│   ├── test-draft.js               # 自動投稿メインスクリプト
-│   └── check-post.js               # 投稿確認
-├── templates/                  # 記事テンプレート集
-│   ├── article-structure.md        # 構成テンプレート
-│   ├── title-patterns.md           # タイトルパターン
-│   └── nanobana-prompts.md         # NanoBanana2 プロンプト
-├── research/                   # リサーチ結果
-│   ├── pass1_market_research.md    # Pass1 マーケットリサーチ
-│   └── pass2_deepdive.md           # Pass2 深掘りリサーチ
-├── test/
-│   └── sample-article.md           # テスト記事テンプレート
-├── 要件定義書.md                # システム全体の要件定義
-├── .env.example                # 環境変数テンプレート
-├── .gitignore
-├── package.json
-└── README.md
-```
+- **Python** 3.9+（nanobanana-pro用）
+- **Chrome / Chromium**（Playwright用）
+- **note.com アカウント**（Cookieで認証）
+- **Googleアカウント**（NanoBanana2の画像生成）
 
 ## Security
 
-- **Cookie ファイル、.env、セッション状態ファイルは Git にコミットされません**
-- `.gitignore` で除外済み
-- Cookie はパスワードと同等の機密情報として扱ってください
-- セッションは 1〜2 週間で期限切れ → Cookie の再取得が必要
-
-## Limitations
-
-- note.com に公式 API は存在しません（ブラウザ自動操作で動作）
-- note.com の UI 変更により動作しなくなる可能性があります
-- サムネイル画像の自動アップロードは今後対応予定
-- 短時間での大量投稿はアカウント制限の原因になる可能性があります
+- Cookie・セッション状態ファイルはGitにコミットされません
+- `.gitignore` で `output/`, `data/browser_profile/`, `*.json` を除外済み
+- セッションは1〜2週間で期限切れ → Cookie再取得 or Googleログイン再認証
 
 ## License
 
 MIT
-
-## Disclaimer
-
-本ツールは個人利用を想定しています。note.com の利用規約を遵守してご利用ください。

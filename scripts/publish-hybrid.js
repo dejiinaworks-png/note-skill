@@ -121,18 +121,21 @@ try {
   await page.goto('https://note.com/notes/new', { waitUntil: 'networkidle', timeout: 30000 });
   await page.waitForTimeout(3000);
   if (page.url().includes('login')) throw new Error('セッション無効');
-  console.log(`  URL: ${page.url()}`);
+  // エディターURLを保存（サムネ離脱後に同じ下書きに戻るため）
+  const editorUrl = page.url();
+  console.log(`  URL: ${editorUrl}`);
 
   // ===== 3. サムネイル設定（UIで） =====
   if (THUMBNAIL_PATH && existsSync(resolve(THUMBNAIL_PATH))) {
     console.log('[3/6] サムネイル設定...');
+    let thumbnailOk = false;
     try {
       const addImgBtn = page.locator('button[aria-label="画像を追加"]').first();
-      if (await addImgBtn.isVisible({ timeout: 3000 })) {
+      if (await addImgBtn.isVisible({ timeout: 5000 })) {
         await addImgBtn.click();
         await page.waitForTimeout(1500);
         const uploadBtn = page.locator('button:has-text("画像をアップロード")').first();
-        if (await uploadBtn.isVisible({ timeout: 2000 })) {
+        if (await uploadBtn.isVisible({ timeout: 3000 })) {
           const [fc] = await Promise.all([
             page.waitForEvent('filechooser', { timeout: 10000 }),
             uploadBtn.click(),
@@ -141,25 +144,35 @@ try {
           await page.waitForTimeout(3000);
           // トリミングモーダルの「保存」
           const saveBtn = page.locator('.ReactModal__Content button:has-text("保存")').first();
-          if (await saveBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+          if (await saveBtn.isVisible({ timeout: 8000 }).catch(() => false)) {
             await saveBtn.click();
-            await page.waitForTimeout(3000);
+            // 保存後のナビゲーション完了を待つ
+            await page.waitForTimeout(4000);
           }
-          console.log('  OK');
+          thumbnailOk = true;
+          console.log('  サムネイル設定完了');
         }
+      } else {
+        console.log('  「画像を追加」ボタンが見つからない');
       }
     } catch (e) {
       console.log(`  FAIL: ${e.message.slice(0, 80)}`);
     }
-    // モーダル/ダイアログを閉じる
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(2000);
 
-    // エディターに戻れなかった場合
-    if (!page.url().includes('editor.note.com')) {
-      console.log('  エディターに再遷移...');
-      await page.goto('https://note.com/notes/new', { waitUntil: 'networkidle', timeout: 30000 });
+    // エディターから離脱していたら元の下書きURLに戻る
+    const currentUrl = page.url();
+    if (!currentUrl.includes('editor.note.com') || currentUrl !== editorUrl) {
+      console.log(`  現在URL: ${currentUrl}`);
+      console.log(`  エディター(${editorUrl})に戻ります...`);
+      await page.goto(editorUrl, { waitUntil: 'networkidle', timeout: 30000 });
       await page.waitForTimeout(3000);
+      if (page.url().includes('login')) throw new Error('セッション無効（再遷移後）');
+    }
+
+    if (thumbnailOk) {
+      console.log('[3/6] OK');
+    } else {
+      console.log('[3/6] SKIP: サムネイル設定失敗');
     }
   } else {
     console.log('[3/6] SKIP: サムネなし');

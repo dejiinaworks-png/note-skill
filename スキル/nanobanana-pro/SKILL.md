@@ -1,7 +1,6 @@
 ---
 name: gemini-image-generator
-description: AI image generation via Gemini
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+description: Generate images using Google Gemini NanoBanana via browser automation. Use this skill for general-purpose AI image generation from text prompts. Includes persistent authentication, automatic environment setup, and reference image support for style matching.
 ---
 
 # Gemini Image Generator
@@ -24,7 +23,7 @@ Trigger when user:
 ## Quick Start
 
 ```bash
-cd "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/スキル/nanobanana-pro"
+cd /path/to/gemini-image-generator
 
 # 1. Check authentication
 python scripts/run.py auth_manager.py status
@@ -35,13 +34,13 @@ python scripts/run.py auth_manager.py setup
 # 3. Generate image (basic)
 python scripts/run.py image_generator.py \
   --prompt "sunset over mountains, watercolor style" \
-  --output "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/output/articles/images/my_image.png"
+  --output output/my_image.png
 
-# 4. Generate with reference image
+# 4. Generate with reference image (NEW!)
 python scripts/run.py image_generator.py \
   --prompt "犬を描いて" \
   --reference-image "/path/to/reference.png" \
-  --output "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/output/articles/images/dog.png"
+  --output output/styled_dog.png
 ```
 
 ## How It Works
