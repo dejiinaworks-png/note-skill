@@ -1,5 +1,8 @@
 {
   "alwaysThinkingEnabled": true,
+  "env": {
+    "PATH": "C:\\Users\\Tatsu\\AppData\\Local\\Programs\\Python\\Python311\\Scripts;C:\\Users\\Tatsu\\AppData\\Local\\Programs\\Python\\Python311;${PATH}"
+  },
   "disabledMcpServers": [
     "figma",
     "qdrant",
@@ -137,6 +140,16 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node .claude/hooks/auto-memory-saver.js",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
             "command": "node .claude/hooks/compact-optimizer.js",
             "timeout": 2
           }
@@ -165,6 +178,17 @@
         ]
       }
     ],
-    "Stop": []
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/stop-activity-logger.js",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   }
 }

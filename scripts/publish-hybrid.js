@@ -12,6 +12,8 @@ const ARTICLE_PATH = process.argv[2];
 const THUMBNAIL_PATH = process.argv[3] || '';
 const MODE = process.argv[4] || 'draft';
 const IMAGES_DIR = process.argv[5] || '';
+const MAGAZINE = process.argv[6] || '';
+const NOTE_ID = process.argv[7] || '';  // 既存下書きIDを渡すと上書き（省略時は新規作成）
 
 if (!ARTICLE_PATH || !existsSync(ARTICLE_PATH)) {
   console.error('Usage: node publish-hybrid.js <article.md> [thumbnail.png] [draft|publish] [images_dir]');
@@ -50,6 +52,63 @@ console.log(`タグ: ${tags.join(', ')}`);
 console.log(`画像: ${imageMarkers.length}枚`);
 console.log(`サムネ: ${THUMBNAIL_PATH || 'なし'}`);
 console.log(`モード: ${MODE}\n`);
+
+// ===== ヘルパー =====
+// 邪魔なモーダルを閉じる（AIアシスタント確認ダイアログ等）
+async function dismissModals(page) {
+  try {
+    const overlay = page.locator('.ReactModal__Overlay').first();
+    if (!await overlay.isVisible({ timeout: 500 }).catch(() => false)) return;
+    // AIアシスタントモーダルの「キャンセル」ボタンを優先してクリック
+    const cancelBtn = page.locator('button:has-text("キャンセル")').first();
+    if (await cancelBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+      await cancelBtn.click();
+    } else {
+      await page.keyboard.press('Escape');
+    }
+    await page.waitForTimeout(600);
+  } catch {}
+}
+
+// + メニューから項目をクリック
+async function clickPlusMenuItem(page, itemText) {
+  await dismissModals(page);
+  const plusBtn = page.locator('button[aria-label="メニューを開く"]').first();
+  if (!await plusBtn.isVisible({ timeout: 3000 }).catch(() => false)) return false;
+  await plusBtn.click({ force: true });
+  await page.waitForTimeout(1500);
+  const ok = await page.evaluate((text) => {
+    const btn = [...document.querySelectorAll('button')].find(
+      b => b.textContent?.trim() === text && b.offsetParent !== null
+    );
+    if (btn) { btn.click(); return true; }
+    return false;
+  }, itemText);
+  await page.waitForTimeout(300);
+  return ok;
+}
+
+// Bold(**...**) / インラインコード(`...`) 対応テキスト入力
+async function typeRichText(page, text) {
+  const tokens = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/);
+  for (const token of tokens) {
+    if (!token) continue;
+    if (token.startsWith('`') && token.endsWith('`') && token.length > 2) {
+      const code = token.slice(1, -1);
+      await page.keyboard.type(code, { delay: 3 });
+      for (let i = 0; i < code.length; i++) await page.keyboard.press('Shift+ArrowLeft');
+      await page.keyboard.press('Control+Shift+m');
+      await page.keyboard.press('ArrowRight');
+    } else if (token.startsWith('**') && token.endsWith('**')) {
+      const bold = token.slice(2, -2);
+      await page.keyboard.press('Control+b');
+      await page.keyboard.type(bold, { delay: 3 });
+      await page.keyboard.press('Control+b');
+    } else {
+      await page.keyboard.type(token, { delay: 3 });
+    }
+  }
+}
 
 const browser = await chromium.launch({ headless: false });
 const context = await browser.newContext({ storageState: STATE_PATH });
@@ -114,11 +173,11 @@ try {
 
   // ===== 2. エディターを開く =====
   console.log('[2/6] エディターを開く...');
-  // showOpenFilePickerを無効化 → Playwrightのfilechooserが使えるようになる
-  await context.addInitScript(() => {
-    delete window.showOpenFilePicker;
-  });
-  await page.goto('https://note.com/notes/new', { waitUntil: 'networkidle', timeout: 30000 });
+  await context.addInitScript(() => { delete window.showOpenFilePicker; });
+  const editorTarget = NOTE_ID
+    ? `https://editor.note.com/notes/${NOTE_ID}/edit/`
+    : 'https://note.com/notes/new';
+  await page.goto(editorTarget, { waitUntil: 'networkidle', timeout: 30000 });
   await page.waitForTimeout(3000);
   if (page.url().includes('login')) throw new Error('セッション無効');
   // エディターURLを保存（サムネ離脱後に同じ下書きに戻るため）
@@ -193,7 +252,19 @@ try {
   await page.waitForTimeout(500);
   await page.locator(bodySel).click({ force: true });
 
-  const lines = body.split('\n');
+  // 画像行の直前・直後の空行を除去
+  const rawLines = body.split('\n');
+  const lines = rawLines.filter((line, i) => {
+    const t = line.trim();
+    if (t !== '') return true;
+    const prevImg = i > 0 && /^!\[/.test(rawLines[i - 1].trim());
+    const nextImg = i < rawLines.length - 1 && /^!\[/.test(rawLines[i + 1].trim());
+    return !prevImg && !nextImg;
+  });
+
+  let inList = false;
+  let inCodeBlock = false;
+  let inQuote = false;
   for (const line of lines) {
     const t = line.trim();
 
@@ -203,7 +274,11 @@ try {
       const imgPath = resolve(IMAGES_DIR || '.', imgMatch[2]);
       if (!existsSync(imgPath)) continue;
 
-      await page.keyboard.press('Enter');
+      // 画像挿入前にリスト/コードブロック/引用を閉じる
+      if (inList) { await page.keyboard.press('Backspace'); await page.waitForTimeout(200); inList = false; }
+      if (inCodeBlock) { await page.keyboard.press('Escape'); await page.keyboard.press('ArrowDown'); inCodeBlock = false; }
+      if (inQuote) { await page.keyboard.press('Enter'); await page.waitForTimeout(200); inQuote = false; }
+
       await page.waitForTimeout(1000);
 
       let inserted = false;
@@ -289,47 +364,174 @@ try {
       continue;
     }
 
+    // リストから出る
+    if (inList && !t.startsWith('- ') && !t.startsWith('* ')) {
+      await page.keyboard.press('Backspace');
+      await page.waitForTimeout(200);
+      inList = false;
+    }
+    // 引用ブロックから出る
+    if (inQuote && !t.startsWith('> ')) {
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(200);
+      inQuote = false;
+    }
+
+    // 空行 / 区切り
     if (t === '' || t === '---') {
       await page.keyboard.press('Enter');
-    } else {
-      await page.keyboard.type(line, { delay: 3 });
-      await page.keyboard.press('Enter');
+      continue;
     }
+
+    // コードブロック 開始/終了
+    if (t.startsWith('```')) {
+      if (!inCodeBlock) {
+        await clickPlusMenuItem(page, 'コード');
+        await page.waitForTimeout(300);
+        inCodeBlock = true;
+      } else {
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(200);
+        await page.keyboard.press('ArrowDown');
+        inCodeBlock = false;
+      }
+      continue;
+    }
+
+    // コードブロック内
+    if (inCodeBlock) {
+      await page.keyboard.type(t, { delay: 3 });
+      await page.keyboard.press('Enter');
+      continue;
+    }
+
+    // H2 大見出し
+    if (t.startsWith('## ')) {
+      await clickPlusMenuItem(page, '大見出し');
+      await page.waitForTimeout(300);
+      await typeRichText(page, t.slice(3));
+      await page.keyboard.press('Enter');
+      continue;
+    }
+
+    // H3 小見出し
+    if (t.startsWith('### ')) {
+      await clickPlusMenuItem(page, '小見出し');
+      await page.waitForTimeout(300);
+      await typeRichText(page, t.slice(4));
+      await page.keyboard.press('Enter');
+      continue;
+    }
+
+    // 引用ブロック
+    if (t.startsWith('> ')) {
+      if (!inQuote) {
+        await clickPlusMenuItem(page, '引用');
+        await page.waitForTimeout(300);
+        inQuote = true;
+      }
+      await typeRichText(page, t.slice(2));
+      await page.keyboard.press('Enter');
+      continue;
+    }
+
+    // 箇条書き
+    if (t.startsWith('- ') || t.startsWith('* ')) {
+      if (!inList) {
+        await clickPlusMenuItem(page, '箇条書き');
+        await page.waitForTimeout(300);
+        inList = true;
+      }
+      await typeRichText(page, t.slice(2));
+      await page.keyboard.press('Enter');
+      continue;
+    }
+
+    // 通常テキスト（Bold / インラインコード対応）
+    await typeRichText(page, line);
+    await page.keyboard.press('Enter');
   }
+
+  // ループ終了後に残ったブロックを閉じる
+  if (inList) { await page.keyboard.press('Backspace'); inList = false; }
+  if (inCodeBlock) { await page.keyboard.press('Escape'); await page.keyboard.press('ArrowDown'); inCodeBlock = false; }
+  if (inQuote) { await page.keyboard.press('Enter'); inQuote = false; }
+
   await page.waitForTimeout(1000);
 
-  // ===== 6. 下書き保存 or 公開 =====
-  console.log('[6/6] 保存/公開...');
+  // ===== 6. 下書き保存 =====
+  console.log('[6/7] 下書き保存...');
+  await dismissModals(page);
   const draftBtn = page.locator('button:has-text("下書き保存")').first();
   if (await draftBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await draftBtn.click();
+    await draftBtn.click({ force: true });
     await page.waitForTimeout(2000);
   }
 
-  if (MODE === 'publish') {
-    const pubBtn = page.locator('button:has-text("公開に進む")').first();
-    if (await pubBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await pubBtn.click();
-      await page.waitForTimeout(2000);
-      // タグ入力
-      if (tags.length > 0) {
-        try {
-          const tagInput = page.locator('input[placeholder*="ハッシュタグ"]').first();
-          if (await tagInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-            for (const tag of tags.slice(0, 10)) {
-              await tagInput.fill(tag);
-              await page.keyboard.press('Enter');
-              await page.waitForTimeout(300);
-            }
+  // ===== 7. タグ・マガジン設定（draft/publish共通） =====
+  console.log('[7/7] タグ・マガジン設定...');
+  await dismissModals(page);
+  const pubBtn = page.locator('button:has-text("公開に進む")').first();
+  if (await pubBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await pubBtn.click();
+    await page.waitForTimeout(2000);
+
+    // タグ入力
+    if (tags.length > 0) {
+      try {
+        const tagInput = page.locator('input[placeholder*="ハッシュタグ"]').first();
+        if (await tagInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+          for (const tag of tags.slice(0, 10)) {
+            await tagInput.fill(tag);
+            await page.keyboard.press('Enter');
+            await page.waitForTimeout(400);
           }
-        } catch {}
+          console.log(`  タグ設定: ${tags.join(', ')}`);
+        }
+      } catch (e) {
+        console.log(`  タグ設定失敗: ${e.message.slice(0, 50)}`);
       }
-      await page.waitForTimeout(1000);
+    }
+
+    // マガジン設定
+    if (MAGAZINE) {
+      try {
+        const magBtn = page.locator('button:has-text("マガジンに追加")').first();
+        if (await magBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await magBtn.click();
+          await page.waitForTimeout(1500);
+          const magItem = page.locator(`li:has-text("${MAGAZINE}")`).first();
+          if (await magItem.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await magItem.click();
+            await page.waitForTimeout(1000);
+            console.log(`  マガジン設定: ${MAGAZINE}`);
+          } else {
+            console.log(`  マガジン「${MAGAZINE}」が見つからない`);
+          }
+        } else {
+          console.log('  マガジン追加ボタンが見つからない');
+        }
+      } catch (e) {
+        console.log(`  マガジン設定失敗: ${e.message.slice(0, 50)}`);
+      }
+    }
+
+    await page.waitForTimeout(1000);
+
+    if (MODE === 'publish') {
       const postBtn = page.locator('button:has-text("投稿")').first();
       if (await postBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         await postBtn.click();
         await page.waitForTimeout(5000);
       }
+    } else {
+      // draft: タグ・マガジン設定後に下書き保存して戻る
+      const draftBtn2 = page.locator('button:has-text("下書き保存")').first();
+      if (await draftBtn2.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await draftBtn2.click();
+        await page.waitForTimeout(2000);
+      }
+      console.log('  タグ・マガジン設定を下書きに保存');
     }
   }
 

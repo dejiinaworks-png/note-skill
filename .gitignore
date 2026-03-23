@@ -45,3 +45,26 @@ research/
 .claude/temp/
 .claude/hooks/data/model-switch.log
 .claude/hooks/data/skill-guard-detail.json
+
+# Session state & activity logs (personal/temporary)
+.agent_usage_state.json
+.claude/hooks/data/activity-log.jsonl
+.claude/hooks/data/agent-guard-detail.json
+
+# Browser profiles (auth data)
+data/browser_profile_note/
+data/
+
+# Personal scripts with private URLs
+fetch_article.py
+
+# Python virtualenv inside skill/
+skill/*/.venv/
+skill/*/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Browser profiles inside skill/ (auth data)
+skill/*/data/browser_profile/
+skill/*/data/state.json
