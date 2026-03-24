@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Claude agents (private — do not share)
+.claude/agents/
+
 # Authentication & Secrets (NEVER commit these)
 .env
 *.cookies.txt
