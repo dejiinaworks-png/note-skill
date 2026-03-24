@@ -14,6 +14,8 @@ const MODE = process.argv[4] || 'draft';
 const IMAGES_DIR = process.argv[5] || '';
 const MAGAZINE = process.argv[6] || '';
 const NOTE_ID = process.argv[7] || '';  // 既存下書きIDを渡すと上書き（省略時は新規作成）
+// NOTE_IDがある場合は「サムネのみ更新」モード（本文・タイトル・タグは変更しない）
+const THUMB_ONLY = !!NOTE_ID;
 
 if (!ARTICLE_PATH || !existsSync(ARTICLE_PATH)) {
   console.error('Usage: node publish-hybrid.js <article.md> [thumbnail.png] [draft|publish] [images_dir]');
@@ -189,6 +191,26 @@ try {
     console.log('[3/6] サムネイル設定...');
     let thumbnailOk = false;
     try {
+      // ページ最上部にスクロール
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(800);
+
+      // 既存アイキャッチ(alt="eyecatch")がある場合: クリックして×ボタンで削除
+      const existingEyecatch = page.locator('img[alt="eyecatch"]').first();
+      if (await existingEyecatch.isVisible({ timeout: 3000 }).catch(() => false)) {
+        console.log('  既存アイキャッチを削除...');
+        // アイキャッチ右上の×ボタンを座標で特定してクリック
+        // note.com editor: ×ボタンはeyecatch imgの右上角付近（img右端-48px, img top+16px）に固定配置
+        const eyecatchRect = await existingEyecatch.boundingBox();
+        if (eyecatchRect) {
+          const xBtnX = Math.round(eyecatchRect.x + eyecatchRect.width - 32);
+          const xBtnY = Math.round(eyecatchRect.y + 16);
+          await page.mouse.click(xBtnX, xBtnY);
+          await page.waitForTimeout(1500);
+          console.log(`  ×ボタンクリック (${xBtnX}, ${xBtnY})`);
+        }
+      }
+
       const addImgBtn = page.locator('button[aria-label="画像を追加"]').first();
       if (await addImgBtn.isVisible({ timeout: 5000 })) {
         await addImgBtn.click();
@@ -235,6 +257,17 @@ try {
     }
   } else {
     console.log('[3/6] SKIP: サムネなし');
+  }
+
+  // サムネのみ更新モード: タイトル・本文・タグはスキップして下書き保存のみ
+  if (THUMB_ONLY) {
+    console.log('[4-7/7] THUMB_ONLYモード: タイトル・本文・タグ変更なし。下書き保存...');
+    await page.locator('button:has-text("下書き保存")').first().click();
+    await page.waitForTimeout(2000);
+    console.log('\n=== 完了 (サムネのみ更新) ===');
+    console.log(`URL: https://editor.note.com/notes/${NOTE_ID}/publish/`);
+    await browser.close();
+    process.exit(0);
   }
 
   // ===== 4. タイトル入力 =====
