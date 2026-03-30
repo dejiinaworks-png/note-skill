@@ -1,8 +1,8 @@
 # Dependencies
 node_modules/
 
-# Claude agents (private — do not share)
-.claude/agents/
+# Claude Code internal config (private — do not share)
+.claude/
 
 # Authentication & Secrets (NEVER commit these)
 .env
@@ -22,6 +22,27 @@ test/*.jpg
 # OS
 .DS_Store
 Thumbs.db
+
+# MCP configuration (internal)
+.mcp.json
+
+# Requirements / internal docs
+要件定義書.md
+
+# Debug scripts
+scripts/debug/
+
+# Extra scripts not in main workflow
+scripts/cookies-to-state.js
+scripts/generate-thumbnail.js
+scripts/publish-api.js
+scripts/publish-article.js
+
+# Logs
+docs/logs/
+
+# Test artifacts
+test/sample-article.md
 
 # Research docs (personal)
 システムリサーチ専用コピペ.md
