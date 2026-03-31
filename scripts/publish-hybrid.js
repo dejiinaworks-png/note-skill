@@ -11,16 +11,17 @@ import { homedir } from 'os';
 
 // --- Activation Key Check ---
 const WORKER_URL = 'https://note-activate.yahabaera007.workers.dev';
-const KEY_FILE = join(homedir(), '.note-activate-key');
+const KEY_FILE = join(resolve(), 'activate.key');
+const PLACEHOLDER = 'PASTE-YOUR-KEY-HERE';
 
 async function checkActivation() {
   let key = '';
   if (existsSync(KEY_FILE)) {
     key = readFileSync(KEY_FILE, 'utf-8').trim();
   }
-  if (!key) {
+  if (!key || key === PLACEHOLDER) {
     console.error('❌ アクティベーションキーが設定されていません。');
-    console.error(`   以下のファイルにキーを記入してください: ${KEY_FILE}`);
+    console.error(`   プロジェクトフォルダの activate.key を開き、受け取ったキーを貼り付けてください。`);
     process.exit(1);
   }
   try {
