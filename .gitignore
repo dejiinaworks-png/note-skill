@@ -18,6 +18,7 @@ test/*.jpg
 
 # Local backups
 .claude-local-backup/
+バックアップ/
 
 # OS
 .DS_Store
