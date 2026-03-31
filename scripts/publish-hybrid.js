@@ -5,8 +5,43 @@
  * 全てエディターの自然なフローに乗せる
  */
 import { chromium } from 'playwright';
-import { readFileSync, existsSync } from 'fs';
-import { resolve, basename } from 'path';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { resolve, basename, join } from 'path';
+import { homedir } from 'os';
+
+// --- Activation Key Check ---
+const WORKER_URL = 'https://note-activate.yahabaera007.workers.dev';
+const KEY_FILE = join(homedir(), '.note-activate-key');
+
+async function checkActivation() {
+  let key = '';
+  if (existsSync(KEY_FILE)) {
+    key = readFileSync(KEY_FILE, 'utf-8').trim();
+  }
+  if (!key) {
+    console.error('❌ アクティベーションキーが設定されていません。');
+    console.error(`   以下のファイルにキーを記入してください: ${KEY_FILE}`);
+    process.exit(1);
+  }
+  try {
+    const res = await fetch(`${WORKER_URL}/?key=${encodeURIComponent(key)}`);
+    const data = await res.json();
+    if (!data.valid) {
+      if (data.reason === 'expired') {
+        console.error(`❌ アクティベーションキーの有効期限が切れています（期限: ${data.expiry}）`);
+      } else {
+        console.error('❌ アクティベーションキーが無効です。');
+      }
+      process.exit(1);
+    }
+    console.log(`✅ 認証OK（有効期限: ${data.expiry}）`);
+  } catch (e) {
+    console.error('⚠️ 認証サーバーに接続できません。インターネット接続を確認してください。');
+    process.exit(1);
+  }
+}
+
+await checkActivation();
 
 const ARTICLE_PATH = process.argv[2];
 const THUMBNAIL_PATH = process.argv[3] || '';
@@ -509,20 +544,49 @@ try {
     await pubBtn.click();
     await page.waitForTimeout(2000);
 
-    // タグ入力
+    // タグ入力（公開設定ページのハッシュタグセクションを使用）
     if (tags.length > 0) {
       try {
-        const tagInput = page.locator('input[placeholder*="ハッシュタグ"]').first();
-        if (await tagInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+        // サイドバーの「ハッシュタグ」メニューをクリックして確実に遷移
+        await page.waitForTimeout(2000);
+        const hashtagNav = page.locator('nav a:has-text("ハッシュタグ"), li:has-text("ハッシュタグ"), a:has-text("ハッシュタグ")').first();
+        if (await hashtagNav.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await hashtagNav.click();
+          await page.waitForTimeout(1500);
+        }
+
+        // 既存タグをすべて削除
+        const removeSelectors = [
+          '[aria-label="タグを削除"]',
+          'button.remove',
+          '[class*="tag"] button',
+          'span[class*="delete"]',
+        ];
+        for (const sel of removeSelectors) {
+          const btns = page.locator(sel);
+          const count = await btns.count();
+          for (let i = count - 1; i >= 0; i--) {
+            await btns.nth(i).click().catch(() => {});
+            await page.waitForTimeout(200);
+          }
+        }
+
+        // ハッシュタグ入力欄（公開設定ページ）
+        const tagInput = page.locator('input[placeholder="ハッシュタグを追加する"], input[placeholder*="ハッシュタグ"]').first();
+        if (await tagInput.isVisible({ timeout: 5000 }).catch(() => false)) {
           for (const tag of tags.slice(0, 10)) {
+            await tagInput.click();
             await tagInput.fill(tag);
+            await page.waitForTimeout(300);
             await page.keyboard.press('Enter');
-            await page.waitForTimeout(400);
+            await page.waitForTimeout(600);
           }
           console.log(`  タグ設定: ${tags.join(', ')}`);
+        } else {
+          console.log('  ハッシュタグ入力欄が見つかりません');
         }
       } catch (e) {
-        console.log(`  タグ設定失敗: ${e.message.slice(0, 50)}`);
+        console.log(`  タグ設定失敗: ${e.message.slice(0, 80)}`);
       }
     }
 
