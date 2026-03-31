@@ -1,141 +1,132 @@
-# サムネイル設計ガイド v2.0
+# サムネイル設計ガイド v3.0
 
 note.com のクリック率を最大化するサムネイル設計。
-**目標: 一目でターゲット読者が「自分ごと」と感じるデザイン**
+**目標：一目でターゲット読者が「自分ごと」と感じるデザイン**
 
 ---
 
-## 設計原則
+## 基本ルール
 
-1. **痛みポイントを見せる** — ユーザーの悩みを視覚化（検索から来た人に刺さる）
-2. **解決を約束する** — 1秒で「これが答えだ」と伝わるビジュアル
-3. **日本語テキスト禁止** — Geminiは日本語テキストが不安定。英語のみ or 文字なし
-4. **1焦点の法則** — 中央に1つの主役を置く。情報を詰め込まない
-5. **高コントラスト** — 暗背景 × 明るい前景。スマホの小さい画面でも見える
+```
+① プロンプトは日本語で書く
+② 「ゴシック体フォントを使用」と必ず書く
+③ サイズは 1280×670px（16:9）固定
+④ 情報は詰め込まない（1焦点の法則）
+⑤ 「Claude」「ChatGPT」などの固有名詞は英語のままOK
+```
+
+---
+
+## note.com 推奨サイズ
+
+```
+1280 × 670px（16:9）
+コマンド：--aspect landscape
+```
 
 ---
 
 ## パターン別プロンプト
 
-### パターン1: 問題→解決 スプリット（ハウツー・解説記事）
+### パターン1：キャッチコピー型（解説・まとめ記事）
 
-**用途:** セットアップ手順・使い方・解説系
-
-```
-Split layout thumbnail, left half dark charcoal background showing frustration:
-person with question marks and error icons, messy tangled cables.
-Right half bright cyan background showing success:
-clean workflow icons, checkmarks, person looking satisfied.
-Center: bold white arrow pointing right from problem to solution.
-Top banner: "[TOPIC] Setup Guide" in bold white sans-serif.
-Clean modern flat illustration style, 16:9 format, professional.
-No Japanese characters.
-```
-
----
-
-### パターン2: 数字強調（まとめ・比較記事）
-
-**用途:** 〇選・〇つのコツ・ランキング系
+**用途：** ノウハウ・解説・まとめ系
 
 ```
-Dark navy blue background, large bold number "[N]" in bright yellow taking up 40% of image.
-Right side: vertical list of [N] small icons representing each item.
-Top: "[TOPIC]" in white bold uppercase text.
-Bottom: subtitle "[subtopic]" in smaller white text.
-Clean minimal design, high contrast, modern sans-serif typography.
-No Japanese characters, 16:9 format.
+note.com のサムネイル画像を1枚作成してください。
+画像比率は横1280px × 縦670px（16:9）。ゴシック体フォントを使用。
+背景：明るい青のグラデーション。
+中央に大きく太字で「[キャッチコピー]」と表示。
+下部に小さく「[補足テキスト]」。
+右下にシンプルなイラスト（[テーマに合ったアイコン]）。
+パステルカラー、フラットデザイン、プロフェッショナルなデザイン。
 ```
 
 ---
 
-### パターン3: ツール対決（比較記事）
+### パターン2：数字強調型（〇選・ランキング記事）
 
-**用途:** AとBを比較する記事
-
-```
-Dark background, center dividing line.
-Left side: "[Tool A]" logo or icon with blue glow effect.
-Right side: "[Tool B]" logo or icon with orange glow effect.
-Center top: "VS" in large bold white text.
-Bottom center: "Which is Better?" in white.
-Clean dramatic lighting, professional tech comparison style, 16:9.
-No Japanese characters.
-```
-
----
-
-### パターン4: スクリーン + 結果（ツール紹介）
-
-**用途:** ツール・アプリ・サービスの使い方紹介
+**用途：** 〇つの方法・ランキング・まとめ系
 
 ```
-Dark background, laptop or monitor screen in center showing [tool/app] interface.
-Glowing screen effect, lines of code or UI visible on screen.
-Bottom left corner: green checkmark badge with "Works!" text.
-Top: "[TOOL NAME]" in bold white text with accent color underline.
-Modern tech aesthetic, clean flat design, 16:9 format.
-No Japanese characters.
+note.com のサムネイル画像を1枚作成してください。
+画像比率は横1280px × 縦670px（16:9）。ゴシック体フォントを使用。
+背景：濃い紺色。
+左側に大きく「[N]」の数字を黄色で表示。
+右側に「[タイトル]」を白い太字で表示。
+下部に「[補足]」を小さく表示。
+モダンでシンプルなデザイン。
 ```
 
 ---
 
-### パターン5: ビフォーアフター（改善・効率化記事）
+### パターン3：ツール比較型（比較記事）
 
-**用途:** 効率化・改善・生産性UP系
+**用途：** AとBを比較する記事
 
 ```
-Two-panel horizontal layout.
-Left panel: crumpled paper, cluttered desk, red X marks, label "BEFORE" in red.
-Right panel: clean organized workspace, green checkmarks, label "AFTER" in green.
-Center dividing element: vertical line with clock/timer icon showing time saved.
-White background, bright accent colors, flat vector illustration style, 16:9.
-No Japanese characters.
+note.com のサムネイル画像を1枚作成してください。
+画像比率は横1280px × 縦670px（16:9）。ゴシック体フォントを使用。
+中央に縦の区切り線。
+左側：「[ツールA]」のロゴまたはアイコン、青いグロー効果。
+右側：「[ツールB]」のロゴまたはアイコン、オレンジのグロー効果。
+上部中央：「どちらを選ぶ？」を大きく表示。
+暗い背景、劇的な照明効果、プロフェッショナルなデザイン。
 ```
 
 ---
 
-## 記事タイプ × パターン対応表
+### パターン4：キャラクター型（体験談・ストーリー記事）
 
-| 記事タイプ | 推奨パターン | 理由 |
-|-----------|------------|------|
-| インストール・セットアップ | パターン1（問題→解決） | 手順を踏んで解決するイメージ |
-| 〇選・まとめ | パターン2（数字強調） | 数字で情報量が伝わる |
-| ツール比較 | パターン3（ツール対決） | 対立構図で興味を引く |
-| ツール紹介 | パターン4（スクリーン） | 実際の使用感が伝わる |
-| 効率化・改善 | パターン5（ビフォーアフター） | 変化量がひと目でわかる |
+**用途：** 体験談・失敗談・成功体験
+
+```
+note.com のサムネイル画像を1枚作成してください。
+画像比率は横1280px × 縦670px（16:9）。ゴシック体フォントを使用。
+右側に[キャラクター・人物]のイラスト（シンプルなフラットデザイン）。
+左側に吹き出しで「[キャッチコピー]」を大きく表示。
+背景：[テーマに合った色]の明るい背景。
+親しみやすい、ポップなデザイン。
+```
 
 ---
 
-## プロンプトに必ず含める要素
+### パターン5：ビフォーアフター型（効率化・改善記事）
+
+**用途：** 効率化・改善・生産性UP系
 
 ```
-+ 16:9 format（アスペクト比固定）
-+ No Japanese characters（日本語テキスト排除）
-+ flat design or vector illustration（クオリティが安定）
-+ high contrast（視認性確保）
-+ professional / modern（クオリティの底上げ）
+note.com のサムネイル画像を1枚作成してください。
+画像比率は横1280px × 縦670px（16:9）。ゴシック体フォントを使用。
+左右2分割のレイアウト。
+左側（赤系）：「導入前」のラベル、困った顔のアイコン、マイナスなイメージ。
+右側（緑系）：「導入後」のラベル、笑顔のアイコン、プラスなイメージ。
+中央に矢印と「[数値・成果]」を大きく表示。
+フラットデザイン、パステルカラー。
 ```
 
-## 避けるべき要素
+---
 
-```
-- realistic photo style（品質が不安定）
-- many text elements（日本語文字化けのリスク）
-- complex detailed background（散漫になる）
-- neon/cyberpunk（古くなりやすい）
-```
+## 記事タイプ × 推奨パターン
+
+| 記事タイプ | 推奨パターン |
+|-----------|------------|
+| ノウハウ・解説 | パターン1（キャッチコピー型） |
+| 〇選・まとめ | パターン2（数字強調型） |
+| ツール比較 | パターン3（ツール比較型） |
+| 体験談・ストーリー | パターン4（キャラクター型） |
+| 効率化・改善 | パターン5（ビフォーアフター型） |
 
 ---
 
 ## 生成コマンド
 
 ```bash
-cd "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/skill/nanobanana2"
+cd skill/nanobanana2
 
 python scripts/run.py generate.py \
-  --prompt "[上記パターンから選んだプロンプト]" \
-  --output "../../output/articles/images/[slug]_thumbnail.png" \
+  --prompt "[上記パターンのプロンプト]" \
+  --output "../../output/articles/images/[slug]_thumb.png" \
   --aspect landscape
 ```
 
@@ -143,8 +134,8 @@ python scripts/run.py generate.py \
 
 ## 品質チェック（生成後）
 
-- [ ] 日本語文字が含まれていない（または自然に見える）
-- [ ] 背景と前景のコントラストが十分高い
-- [ ] 中央に明確な焦点がある
-- [ ] 記事の内容を一目で表している
-- [ ] スマホ画面サイズ（サムネイル表示）でも認識できる
+- [ ] タイトルや文字がはっきり読めるか
+- [ ] スマホの小さいサムネイルサイズでも認識できるか
+- [ ] 情報が詰め込まれすぎていないか（1焦点）
+- [ ] 記事の内容を一目で表しているか
+- [ ] 文字・背景のコントラストが十分か

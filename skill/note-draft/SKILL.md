@@ -29,7 +29,8 @@ Bash ツールで以下を実行：
 
 ```bash
 "/c/Program Files/nodejs/node.exe" -e "
-const key = require('fs').readFileSync('C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/activate.key', 'utf-8').trim();
+const path = require('path');
+const key = require('fs').readFileSync(path.join(process.cwd(), 'activate.key'), 'utf-8').trim();
 const res = await fetch('https://note-activate.yahabaera007.workers.dev/?key=' + encodeURIComponent(key) + '&skill=note-draft');
 const data = await res.json();
 if (!data.valid) {

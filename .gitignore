@@ -20,6 +20,13 @@ test/*.jpg
 .claude-local-backup/
 バックアップ/
 
+# Cloudflare Worker source (contains proprietary skill content — never commit)
+cloudflare/
+
+# Internal implementation docs (not for public distribution)
+docs/ACTIVATION_KEY_SYSTEM.md
+AIスキルのアクティベーションロック.txt
+
 # OS
 .DS_Store
 Thumbs.db

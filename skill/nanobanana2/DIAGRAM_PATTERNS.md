@@ -945,10 +945,10 @@ A flat lay photography style illustration. Overhead top-down view. Subject: "ク
 ## 使用コマンド例
 
 ```bash
-# P002のフローチャートをnote記事用に生成
-cd "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/skill/nanobanana2"
+# P002のフローチャートをnote記事用に生成（プロジェクトルートから実行）
+cd skill/nanobanana2
 python scripts/run.py generate.py \
   --prompt "クリーンでプロフェッショナルなモダンフラットデザインのフローチャートインフォグラフィックを1枚の横長画像で作成してください。画像比率は横1600px × 縦900px程度。全体テーマ：browser-use CLI 2.0の仕組み。左から右へ：入力→AI処理→CDP接続→ブラウザ操作→結果取得の5ステップ。各ステップに日本語ラベルとアイコン付き。" \
-  --output "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/output/articles/images/diagram.png" \
+  --output "../../output/articles/images/diagram.png" \
   --aspect landscape
 ```

@@ -19,18 +19,16 @@ description: >
 
 ## ベースディレクトリ
 
-```
-C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/skill/nanobanana2
-```
+プロジェクトルート（`note-skill/`）からの相対パスで実行してください。
 
 ## クイックスタート
 
 ```bash
-# 基本的な図解生成
-cd "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/skill/nanobanana2"
+# 基本的な図解生成（プロジェクトルートから実行）
+cd skill/nanobanana2
 python scripts/run.py generate.py \
   --prompt "horizontal comparison diagram: left side 'Before' with red X marks, right side 'After' with green checkmarks, white background, Japanese text, flat design" \
-  --output "C:/Users/Tatsu/Desktop/ツール開発/Note投稿くん/output/articles/images/my_diagram.png" \
+  --output "../../output/articles/images/my_diagram.png" \
   --aspect landscape
 
 # スタイル指定あり
