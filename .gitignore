@@ -25,6 +25,7 @@ cloudflare/
 
 # Internal implementation docs (not for public distribution)
 docs/ACTIVATION_KEY_SYSTEM.md
+docs/IMAGE_GENERATION_GUIDE.md
 AIスキルのアクティベーションロック.txt
 
 # OS
